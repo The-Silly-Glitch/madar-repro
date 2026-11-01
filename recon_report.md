@@ -113,14 +113,22 @@ The HF `README.md` describes the benchmark at a high level (Domain-IL / Class-IL
 ### 4.2 Hard-coded absolute paths
 - `EMBER_Class/main.py`, `EMBER_Task/main.py`, `AZ_Class/main.py`, `AZ_Domain/GRS.py`, `AZ_Domain/MADAR_IFS.py`, `AZ_Domain/MADAR_AWS.py`, and several `.ipynb_checkpoints` files contain absolute paths to authors’ local machines (`/home/msrahman3/...`, `/home/mr6564/...`). These must be overridden with `--data-dir`.
 
-### 4.3 GRS implementation does not use true reservoir sampling
-- The paper defines GRS as sampling uniformly from a growing global pool, and if `β ≥ |P|` it uses all samples.
-- The code in `EMBER_Domain/GRS.py::get_GRS_data` concatenates all previous months, then if `memory_budget < len(previous_Ys)` it randomly shuffles and takes the first `memory_budget` samples. It does **not** maintain a reservoir across tasks; each task re-samples from scratch from the accumulated pool.
+### 4.3 GRS implementation — matches paper definition
+- The paper (Sec. IV-D) defines GRS as: *“simply selects samples at random from a global stored data pool P ... If β ≥ |P|, GRS selects all the available samples in P.”*
+- The code in `EMBER_Domain/GRS.py::get_GRS_data` concatenates all previous tasks into a global pool and, if `memory_budget < len(previous_Ys)`, shuffles and takes the first `memory_budget` samples. This is consistent with the paper’s definition of random sampling from the accumulated pool. It is not required to be reservoir sampling.
+- **Status: not a deviation.**
 
-### 4.4 Domain-IL MADAR does not exactly follow Algorithm 1’s budget split
+### 4.4 Domain-IL MADAR budget split — corrected after code inspection
 - Algorithm 1 computes `β_M, β_G = β·γ`, then within each family splits `β_A, β_S = β_M·Ω` (with `Ω` controlling anomalous/similar split).
-- In `EMBER_Domain/MADAR_IFS.py::IFS`, the code always sets `goodware_budget = malware_budget = ceil(β/2)` (i.e., `γ = 0.5`), ignoring a configurable `γ`. The anomalous/similar split is done by `IFS_Samples` with `v_choose_split = ceil(v_choose/2)`, which is equivalent to `α = 0.5` but the `Ω` parameter is not exposed.
-- For AZ Domain, the paper says `γ = 0.9` because of the 9:1 goodware/malware imbalance, but the AZ_Domain MADAR scripts also hard-code `goodware_budget = malware_budget = ceil(β/2)` (`MADAR_IFS.py` line 157, `MADAR_AWS.py` line 289), contradicting the paper.
+- **EMBER Domain:** In `EMBER_Domain/MADAR_IFS.py::IFS`, the code sets `goodware_budget = malware_budget = ceil(β/2)` (i.e., `γ = 0.5`). This matches the paper for the balanced EMBER dataset.
+- **AZ Domain:** In `AZ_Domain/MADAR_IFS.py::IFS`, the code sets:
+  ```python
+  goodware_budget = int(np.round(memory_budget * 0.9))
+  malware_budget = memory_budget - goodware_budget
+  ```
+  This matches the paper’s `γ = 0.9` for the imbalanced AZ dataset. The reconnaissance initially reported the opposite; this section is corrected.
+- The anomalous/similar split is done by `IFS_Samples` with `v_choose_split = ceil(v_choose/2)`, equivalent to `α = 0.5`, but the `Ω` parameter is not exposed.
+- We will run main AZ Domain experiments with `γ = 0.9` as per the paper. If time permits, we will also run an ablation using `γ = 0.5` at 2–3 budgets to see whether that produced the paper’s Table III numbers.
 
 ### 4.5 Class-/Task-IL replay uses only `replay_config=ifs` semantics partially
 - In `EMBER_Class/train_diversity.py`, `IFS()` and `AWS()` always allocate the full `memory_budget` to malware families; there is **no goodware replay** for Class-/Task-IL. This matches the paper’s Class-/Task-IL description (only malware), but the code path is different from Domain-IL.
@@ -130,17 +138,37 @@ The HF `README.md` describes the benchmark at a high level (Domain-IL / Class-IL
 - Paper: `L_Ember = act4`, `L_AZ = act5`.
 - Code: `EMBER_Domain/MADAR_AWS.py` uses `--layer` default `act4` and provides `fc4`/`fc4_bn` alternatives. AZ Domain `MADAR_AWS.py` was not fully inspected, but the EMBER class/task `aws_encoder.py` defines `Ember_MLP_Net_V2` with only four layers (`act4`), so the AZ-specific `act5` requirement is not obviously present in the AZ Class/Task code.
 
-### 4.7 Batch-normalization handling in MADARθ
-- Paper says BN is omitted during the forward pass for activation extraction to preserve heterogeneity.
-- In `EMBER_Domain/MADAR_AWS.py`, the default model `Ember_MLP_Net` includes BN, and the activation hook is placed on `act4` **after** the BN+ReLU path. The code does have a `--batch_norm` flag, but the logic around line 542 uses `batch_norm == 'yes'` string comparison on a boolean/flag argument, which is likely buggy (`action="store_true"` produces `True`/`False`, never the string `'yes'`).
+### 4.7 Batch-normalization handling in MADARθ — verified
+- Paper (Sec. VI-B) says BN is omitted during the forward pass for activation extraction to preserve heterogeneity.
+- Code evidence:
+  - `MADAR_AWS.py` defines `--batch_norm` with `action="store_true"`, so the variable is boolean `True`/`False`.
+  - At line 542 the code compares it to the string `'yes'`:
+    ```python
+    if batch_norm == 'yes':
+    ```
+    This condition is therefore **always false**.
+  - The `else` branch loads `Ember_MLP_Net_V2()` and copies the trained model’s state dict into it. `Ember_MLP_Net_V2` defines BN modules but comments them out in `forward`:
+    ```python
+    x = self.fc1(x)
+    #x = self.fc1_bn(x)
+    x = self.act1(x)
+    ```
+- Net effect: the activation extraction runs through a no-BN copy of the model, so BN is effectively omitted as the paper requires. However, the mechanism is not a runtime BN switch but a separate no-BN architecture, and the `batch_norm` flag logic is broken. We will preserve the no-BN behavior and record this implementation discrepancy.
 
-### 4.8 Class-/Task-IL training code ignores `--epoch` for the main loop
-- `main.py` passes `iters=args.iters` to `train_cl`. Inside `train_diversity.py`, `iters_to_use = (len(train_dataset)/batch_size) * args.epoch` is computed in `EMBER_Class/train.py`, but `train_diversity.py` (used by main.py) loops exactly `range(1, iters+1)`. Thus the number of optimization steps per task is controlled by `--iters` (default 10,000), not by `--epoch` (default 30), contrary to README wording.
+### 4.8 Class-/Task-IL training loop uses `--iters`, not `--epoch`
+- `main.py` passes `iters=args.iters` to `train_cl`. Inside `train_diversity.py` the loop is `for batch_index in range(1, iters+1)` (line 1050). The `--epoch` argument is parsed but not used to set the number of optimization steps.
+- Default values seen: `--iters 10000`, `--epoch 30`.
+- This is how the official code behaves. We will keep the official defaults and document the actual values used in the README rather than treating it as a deviation to fix.
 
-### 4.9 Random seeds / reproducibility
+### 4.9 Random seeds / reproducibility — bug to fix
 - The paper reports 10–15 runs with different random initializations.
-- `EMBER_Class/main.py` hard-codes `args.seed = 42` after parsing, so **every run uses the same NumPy/Torch seed** unless the line is edited. The same pattern appears in AZ Class/Task `main.py`.
-- In `data.py`, class ordering for the 100 selected classes is fixed by `np.random.seed(42)`; therefore repeated runs cannot vary the class composition, only model initialization (which is also seeded to 42).
+- `EMBER_Class/main.py` and `AZ_Class/main.py` hard-code `args.seed = 42` after parsing:
+  ```python
+  args.seed = 42  #random.randint(1, 99999)
+  np.random.seed(args.seed)
+  torch.manual_seed(args.seed)
+  ```
+- This is a bug: every run uses the same seed. We will make `seed` a configurable CLI argument and run 3 distinct seeds (e.g., 42, 43, 44).
 
 ### 4.10 Model architecture mismatch with paper’s “five fully-connected layers” for AZ
 - The paper says AZ uses a five-fully-connected-layer MLP.
@@ -161,6 +189,14 @@ The HF `README.md` describes the benchmark at a high level (Domain-IL / Class-IL
 4. **Multiple hard-coded paths, seed overrides, and environment-file errors** mean the scripts will not run out-of-the-box.
 5. **No training was performed** for this recon report.
 
+## 5. Verification notes after re-inspecting code
+
+- **GRS:** Confirmed to match the paper (Sec. IV-D) — random sampling from the accumulated global pool, using the whole pool when budget permits.
+- **AZ Domain γ:** Confirmed to be 0.9 in `AZ_Domain/MADAR_IFS.py` (line 157), matching the paper.
+- **MADARθ BN bypass:** The `--batch_norm` flag logic uses a broken string comparison (`batch_norm == 'yes'`), but the fallback path loads `Ember_MLP_Net_V2`, whose `forward` comments out BN layers. Net effect is no-BN extraction, matching the paper, but the implementation mechanism differs.
+- **Seed bug:** Hard-coded `args.seed = 42` in Class-/Task-IL entry points is a confirmed bug; will be fixed.
+- **Class-/Task-IL iters:** Training is controlled by `--iters` (default 10,000), not `--epoch`. Will be kept as-is and documented.
+
 ## 6. Summary
 
-The MADAR repository contains complete Python implementations for all six experimental settings (EMBER/AZ × Domain/Class/Task-IL) and shell job scripts, but it is currently a **research artifact rather than a turnkey reproducibility package**. The main gaps are: missing preprocessing pipeline, HF dataset layout mismatch, hard-coded paths, seed hard-coding, environment-file errors, and several deviations from the paper’s stated algorithmic details (especially the goodware/malware budget split in AZ Domain-IL and the BN handling in MADARθ).
+The MADAR repository contains complete Python implementations for all six experimental settings (EMBER/AZ × Domain/Class/Task-IL) and shell job scripts, but it is currently a **research artifact rather than a turnkey reproducibility package**. The main gaps are: missing preprocessing pipeline, HF dataset layout mismatch, hard-coded paths, seed hard-coding, and environment-file errors. After code inspection, the originally suspected deviations in GRS and AZ Domain γ were found to match the paper; the MADARθ BN behavior matches the paper in effect but through a different mechanism.
