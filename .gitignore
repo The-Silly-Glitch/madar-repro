@@ -12,3 +12,6 @@ venv/
 *.pt
 *.pth
 checkpoints/
+# M1 smoke working dirs + logs (per-task JSONs are consolidated into results/)
+smoke_out_*/
+smoke_*.log

@@ -1,0 +1,70 @@
+{
+  "scenario": "ember_domain",
+  "method": "madar-r",
+  "budget": 10000,
+  "seed": 42,
+  "num_epoch": 1,
+  "max_tasks": 2,
+  "tasks": [
+    "2018-01",
+    "2018-02"
+  ],
+  "per_task": [
+    {
+      "method": "madar-ratio",
+      "memory_budget": 10000,
+      "task": "2018-01",
+      "seed": 42,
+      "num_epoch": 1,
+      "batch_size": 2000,
+      "task_wallclock_min": 0.450396994749705,
+      "train_time_min": 0.3155827045440674,
+      "ifs_replay_selection_s": 0.0,
+      "num_replay": 0,
+      "peak_rss_mb": 2691.17578125,
+      "peak_vram_mb": null,
+      "cuda_available": false,
+      "acc": 0.6768333315849304,
+      "precision": 0.6858850129198967,
+      "recall": 0.6858850129198967,
+      "f1": 0.6664958546115725,
+      "ap": 0.8753360359825724,
+      "roc_auc": 0.853714885015588,
+      "n_train": 55722,
+      "n_test": 6192
+    },
+    {
+      "method": "madar-ratio",
+      "memory_budget": 10000,
+      "task": "2018-02",
+      "seed": 42,
+      "num_epoch": 1,
+      "batch_size": 2000,
+      "task_wallclock_min": 1.25834405819575,
+      "train_time_min": 0.3534987449645996,
+      "ifs_replay_selection_s": 44.6855788230896,
+      "num_replay": 10921,
+      "peak_rss_mb": 3422.40625,
+      "peak_vram_mb": null,
+      "cuda_available": false,
+      "acc": 0.7743272085984548,
+      "precision": 0.7742546958469757,
+      "recall": 0.7742546958469757,
+      "f1": 0.7730025051772149,
+      "ap": 0.8984188464796713,
+      "roc_auc": 0.8726843552103393,
+      "n_train": 59644,
+      "n_test": 11606
+    }
+  ],
+  "env": {
+    "device": "cpu",
+    "cuda_available": false,
+    "cpu": "Intel i5 HX (16 threads)",
+    "ram_gb": 24,
+    "torch": "2.12.1+cpu",
+    "sklearn": "1.9.1",
+    "numpy": "2.5.4",
+    "note": "NVML enumerates 0 GPUs (nvidia-smi: No devices found); CPU-only smoke"
+  }
+}

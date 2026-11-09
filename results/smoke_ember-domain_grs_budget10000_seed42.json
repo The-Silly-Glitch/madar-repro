@@ -1,0 +1,66 @@
+{
+  "scenario": "ember_domain",
+  "method": "grs",
+  "budget": 10000,
+  "seed": 42,
+  "num_epoch": 1,
+  "max_tasks": 2,
+  "tasks": [
+    "2018-01",
+    "2018-02"
+  ],
+  "per_task": [
+    {
+      "method": "grs",
+      "memory_budget": "10000",
+      "task": "2018-01",
+      "seed": 42,
+      "num_epoch": 1,
+      "batch_size": 6000,
+      "task_wallclock_min": 0.2828659256299337,
+      "train_time_min": 0.17783658504486083,
+      "peak_rss_mb": 2162.14453125,
+      "peak_vram_mb": null,
+      "cuda_available": false,
+      "acc": 0.5325624942779541,
+      "precision": 0.5484496124031008,
+      "recall": 0.5484496124031008,
+      "f1": 0.44831650936752554,
+      "ap": 0.7874182846833893,
+      "roc_auc": 0.746660200337864,
+      "n_train": 55722,
+      "n_test": 6192
+    },
+    {
+      "method": "grs",
+      "memory_budget": "10000",
+      "task": "2018-02",
+      "seed": 42,
+      "num_epoch": 1,
+      "batch_size": 6000,
+      "task_wallclock_min": 0.34599199692408245,
+      "train_time_min": 0.19733839035034179,
+      "peak_rss_mb": 2909.19140625,
+      "peak_vram_mb": null,
+      "cuda_available": false,
+      "acc": 0.5720738172531128,
+      "precision": 0.5720317077373772,
+      "recall": 0.5720317077373772,
+      "f1": 0.4976083650840588,
+      "ap": 0.8469959795167724,
+      "roc_auc": 0.8024463433736672,
+      "n_train": 58723,
+      "n_test": 11606
+    }
+  ],
+  "env": {
+    "device": "cpu",
+    "cuda_available": false,
+    "cpu": "Intel i5 HX (16 threads)",
+    "ram_gb": 24,
+    "torch": "2.12.1+cpu",
+    "sklearn": "1.9.1",
+    "numpy": "2.5.4",
+    "note": "NVML enumerates 0 GPUs (nvidia-smi: No devices found); CPU-only smoke"
+  }
+}

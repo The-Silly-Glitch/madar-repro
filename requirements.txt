@@ -1,0 +1,25 @@
+# MADAR repro environment (laptop: Kubuntu 26.04, RTX 4050 6GB, Python 3.14)
+#
+# INSTALL (CUDA build — project standard for M2+ grid runs on the RTX 4050):
+#   uv pip install --python .venv/bin/python \
+#     --index-url https://download.pytorch.org/whl/cu126 \
+#     --extra-index-url https://pypi.org/simple \
+#     -r requirements.txt
+# NOTE: plain `pip install -r requirements.txt` from PyPI resolves torch 2.12.1 to a
+# CUDA-13 wheel; the cu126 index above is what guarantees a real CUDA-12.x build.
+# (M1 smoke ran with the +cpu builds below because NVML enumerates 0 GPUs on this
+# box — see DEVIATIONS.md. The +cpu/+cu126 suffixes are stripped here; the index
+# URL selects the build.)
+--index-url https://download.pytorch.org/whl/cu126
+--extra-index-url https://pypi.org/simple
+
+torch==2.12.1
+torchvision==0.27.1
+numpy==2.5.4
+pandas==3.1.1
+scikit-learn==1.9.1
+scipy==1.18.1
+tqdm==4.70.1
+Pillow==13.0.0
+matplotlib==3.11.2
+seaborn==0.13.2
