@@ -1,0 +1,14 @@
+# Large data + caches — never commit
+data/
+*.npz
+*.tar.bz2
+*.parquet
+__pycache__/
+.venv/
+venv/
+*.pyc
+.ipynb_checkpoints/
+# Keep small result JSONs and plots tracked; ignore heavy checkpoints
+*.pt
+*.pth
+checkpoints/
